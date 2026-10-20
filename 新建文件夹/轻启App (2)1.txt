@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<link rel="manifest" href="./manifest.json">
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').catch(err=>console.log("SW注册失败",err));
+  })
+}
+</script>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>轻启 · 大学生反拖延自我管理工具</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%239ECDBE'/></svg>">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; }
+  body {
+    font-family: 'Noto Sans SC', -apple-system, sans-serif;
+    background: linear-gradient(135deg, #F7F4EE 0%, #E8EFF7 50%, #E4EFEA 100%);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 30px 16px; color: #3A4A5C;
+  }
+  .stage { display:flex; align-items:center; gap:60px; max-width:1100px; width:100%; }
+  .intro { max-width:320px; }
+  .intro .kicker { font-size:12px; letter-spacing:3px; color:#6B9BD2; margin-bottom:14px; }
+  .intro h1 { font-family:'Noto Serif SC', serif; font-size:44px; font-weight:700; letter-spacing:6px; margin-bottom:18px; }
+  .intro .tag { font-size:15px; color:#6B7280; line-height:1.8; margin-bottom:24px; }
+  .intro .line { width:60px; height:2px; background:#6B9BD2; margin:18px 0; }
+  .intro .meta { font-size:12px; color:#9AA0A8; line-height:1.8; }
+
+  .phone {
+    width:390px; height:800px; background:#F2F6FB; border-radius:56px; padding:14px;
+    box-shadow:0 30px 80px rgba(58,74,92,0.25), 0 0 0 2px rgba(255,255,255,0.6) inset;
+    position:relative; flex-shrink:0;
+  }
+  .screen { width:100%; height:100%; border-radius:44px; overflow:hidden; position:relative;
+    background:linear-gradient(180deg,#F5F8FC 0%,#EDF3FA 100%); }
+  .notch { position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width:110px; height:28px; background:#1a1a1a; border-radius:20px; z-index:100; }
+  .statusbar { height:44px; padding:14px 28px 0; display:flex; justify-content:space-between;
+    font-size:13px; font-weight:600; color:#3A4A5C; position:relative; z-index:5; }
+
+  .view { position:absolute; inset:44px 0 90px 0; overflow-y:auto; padding:8px 24px 24px; display:none; }
+  .view.active { display:block; animation:fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  .tabbar { position:absolute; bottom:0; left:0; right:0; height:80px;
+    background:rgba(255,255,255,0.7); backdrop-filter:blur(20px);
+    border-top:1px solid rgba(255,255,255,0.5);
+    display:flex; align-items:center; justify-content:space-around; padding:0 12px; z-index:50; }
+  .tab { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    cursor:pointer; padding:8px 0; border:none; background:transparent;
+    color:#9AA5B1; font-size:10px; font-family:inherit; }
+  .tab svg { width:24px; height:24px; }
+  .tab.active { color:#6B9BD2; font-weight:600; }
+
+  .glass { background:rgba(255,255,255,0.65); backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,0.8); border-radius:20px;
+    box-shadow:0 4px 20px rgba(107,155,210,0.08); }
+
+  /* IP */
+  .ip-bubble { display:flex; align-items:flex-end; gap:10px; padding:6px 4px 16px; }
+  .ip-avatar {
+    width:64px; height:64px; border-radius:50%; overflow:hidden; flex-shrink:0;
+    box-shadow:0 6px 20px rgba(158,205,190,0.4);
+    border:2px solid rgba(255,255,255,0.9);
+    cursor:pointer; transition:transform .25s; background:#F7F4EE;
+  }
+  .ip-avatar:active { transform:scale(0.92); }
+  .ip-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+  .ip-avatar.bounce { animation:bounce .8s ease; }
+  @keyframes bounce {
+    0%,100% { transform:translateY(0) scale(1); }
+    30% { transform:translateY(-14px) scale(1.08); }
+    60% { transform:translateY(0) scale(0.96); }
+  }
+  .chat-bubble {
+    position:relative; background:rgba(255,255,255,0.85); backdrop-filter:blur(10px);
+    padding:10px 14px; border-radius:14px; font-size:12px; color:#3A4A5C;
+    line-height:1.5; max-width:220px;
+    box-shadow:0 2px 10px rgba(107,155,210,0.08);
+  }
+  .chat-bubble::before {
+    content:''; position:absolute; left:-6px; bottom:14px;
+    width:12px; height:12px; background:rgba(255,255,255,0.85);
+    transform:rotate(45deg); border-radius:2px;
+  }
+
+  .greeting { padding:12px 4px 6px; }
+  .greeting .hi { font-family:'Noto Serif SC', serif; font-size:22px; font-weight:700; margin-bottom:4px; }
+  .task-section-label { font-size:12px; color:#9AA5B1; margin:18px 4px 10px; letter-spacing:1px; }
+  .task-list { display:flex; flex-direction:column; gap:10px; }
+  .task-item { padding:14px 16px; display:flex; align-items:flex-start; gap:12px; cursor:pointer; transition:all .2s; }
+  .task-item:hover { transform:translateY(-1px); }
+  .checkbox { width:22px; height:22px; border-radius:50%; border:2px solid #C5D2E3; flex-shrink:0; margin-top:1px;
+    display:flex; align-items:center; justify-content:center; transition:all .2s; }
+  .task-item.done .checkbox { background:#9ECDBE; border-color:#9ECDBE; }
+  .task-item.done .checkbox::after { content:''; width:10px; height:6px; border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg) translateY(-1px); }
+  .task-item.done .task-text { color:#9AA5B1; text-decoration:line-through; }
+  .task-text { flex:1; font-size:14px; line-height:1.5; }
+  .breakdown-btn { font-size:10px; color:#6B9BD2; background:rgba(107,155,210,0.1);
+    border:none; padding:4px 10px; border-radius:10px; cursor:pointer; font-family:inherit; margin-top:6px; }
+  .breakdown-list { margin-top:8px; padding-left:4px; }
+  .breakdown-list .sub-task { font-size:12px; color:#6B7280; padding:4px 0; display:flex; gap:8px; align-items:center; }
+  .breakdown-list .sub-task::before { content:''; width:5px; height:5px; border-radius:50%; background:#9ECDBE; }
+
+  .fab { position:absolute; bottom:100px; right:24px; width:56px; height:56px; border-radius:50%;
+    background:linear-gradient(135deg,#6B9BD2,#8BB5E0); color:#fff; font-size:28px; border:none; cursor:pointer;
+    box-shadow:0 8px 24px rgba(107,155,210,0.4); display:flex; align-items:center; justify-content:center;
+    z-index:60; transition:transform .2s; }
+  .fab:active { transform:scale(0.92); }
+
+  .modal-mask { position:absolute; inset:0; background:rgba(58,74,92,0.3); backdrop-filter:blur(4px);
+    z-index:200; display:none; align-items:flex-end; justify-content:center; }
+  .modal-mask.show { display:flex; }
+  .modal { width:100%; background:#fff; border-radius:28px 28px 0 0; padding:24px; animation:slideUp .3s ease; }
+  @keyframes slideUp { from{transform:translateY(100%);} to{transform:none;} }
+  .modal h3 { font-family:'Noto Serif SC', serif; font-size:18px; margin-bottom:6px; }
+  .modal p { font-size:12px; color:#9AA5B1; margin-bottom:18px; }
+  .modal input { width:100%; border:none; background:#F2F6FB; border-radius:14px;
+    padding:14px 16px; font-size:16px; font-family:inherit; color:#3A4A5C; outline:none; margin-bottom:16px; }
+  .modal-actions { display:flex; gap:10px; }
+  .btn { flex:1; padding:13px; border-radius:14px; border:none; font-size:14px; font-family:inherit; cursor:pointer; font-weight:500; }
+  .btn-primary { background:#6B9BD2; color:#fff; }
+  .btn-ghost { background:#F2F6FB; color:#6B7280; }
+
+  /* 专注 */
+  .focus-wrap { padding:20px 8px; text-align:center; }
+  .focus-ip { width:80px; height:80px; margin:0 auto 10px; border-radius:50%; overflow:hidden;
+    box-shadow:0 6px 20px rgba(158,205,190,0.3); border:2px solid rgba(255,255,255,0.9);
+    background:#F7F4EE; }
+  .focus-ip img { width:100%; height:100%; object-fit:cover; }
+  .focus-ip.breathing { animation:breathe 3s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.08); } }
+  .focus-title { font-size:12px; color:#6B7280; margin-bottom:20px; }
+  .ring-wrap { position:relative; width:220px; height:220px; margin:0 auto 24px; }
+  .ring-wrap svg { transform:rotate(-90deg); }
+  .ring-bg { fill:none; stroke:#E4ECF5; stroke-width:12; }
+  .ring-fg { fill:none; stroke:#9ECDBE; stroke-width:12; stroke-linecap:round;
+    stroke-dasharray:660; stroke-dashoffset:0; transition:stroke-dashoffset 1s linear; }
+  .ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring-center .time { font-family:'Noto Serif SC', serif; font-size:38px; font-weight:700; color:#3A4A5C; }
+  .ring-center .state { font-size:12px; color:#9AA5B1; margin-top:6px; }
+  .focus-actions { display:flex; flex-direction:column; gap:12px; align-items:center; }
+  .focus-btn { width:200px; padding:14px; border-radius:30px; border:none; font-size:15px; font-family:inherit; cursor:pointer; font-weight:500; }
+  .focus-start { background:#9ECDBE; color:#fff; box-shadow:0 6px 20px rgba(158,205,190,0.4); }
+  .focus-exit { background:rgba(255,255,255,0.8); color:#6B7280; border:1px solid #E4ECF5; }
+  .whitelist-tip { margin-top:20px; font-size:11px; color:#9AA5B1; line-height:1.6; }
+
+  /* 进度 */
+  .progress-hero { padding:20px; text-align:center; margin-bottom:16px; }
+  .progress-ring { position:relative; width:180px; height:180px; margin:0 auto 12px; }
+  .progress-ring svg { transform:rotate(-90deg); }
+  .progress-ring .ring-bg { stroke:#EDF3FA; }
+  .progress-ring .ring-fg { stroke:#6B9BD2; stroke-dasharray:565; }
+  .progress-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .progress-num .pct { font-family:'Noto Serif SC', serif; font-size:36px; font-weight:700; color:#3A4A5C; }
+  .progress-num .label { font-size:11px; color:#9AA5B1; }
+  .week-hint { font-size:12px; color:#6B7280; line-height:1.6; }
+  .week-cards { display:flex; gap:10px; margin-top:14px; }
+  .week-card { flex:1; padding:12px 8px; text-align:center; }
+  .week-card .wk { font-size:10px; color:#9AA5B1; margin-bottom:6px; }
+  .week-card .bar { height:40px; border-radius:8px; background:#E4ECF5; position:relative; overflow:hidden; }
+  .week-card .bar-fill { position:absolute; bottom:0; left:0; right:0; background:#9ECDBE; border-radius:8px; }
+  .week-card.current .bar-fill { background:#6B9BD2; }
+
+  /* 我的 */
+  .me-header { padding:16px 4px; display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .me-header .avatar { width:64px; height:64px; border-radius:50%; overflow:hidden;
+    box-shadow:0 6px 20px rgba(158,205,190,0.3); border:2px solid rgba(255,255,255,0.9); background:#F7F4EE; }
+  .me-header .avatar img { width:100%; height:100%; object-fit:cover; }
+  .me-header .name { font-family:'Noto Serif SC', serif; font-size:18px; font-weight:700; }
+  .me-header .sub { font-size:12px; color:#9AA5B1; margin-top:3px; }
+  .setting-row { padding:16px; margin-bottom:10px; }
+  .setting-row .sr-title { font-size:14px; font-weight:500; margin-bottom:6px; }
+  .setting-row .sr-desc { font-size:11px; color:#9AA5B1; line-height:1.5; margin-bottom:12px; }
+  .slider-row { display:flex; justify-content:space-between; font-size:11px; color:#6B7280; margin-bottom:8px; }
+  input[type=range] { width:100%; accent-color:#6B9BD2; }
+  .mood-btn { width:100%; padding:14px; border-radius:14px; border:none; cursor:pointer;
+    background:rgba(170,135,50,0.1); color:#AA8732; font-size:13px; font-family:inherit; font-weight:500; }
+  .mood-btn.paused { background:rgba(158,205,190,0.2); color:#5FA691; }
+  .circle-entry { padding:14px 16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+  .circle-entry .ce-left { font-size:13px; }
+  .circle-entry .ce-left small { display:block; color:#9AA5B1; font-size:10px; margin-top:3px; }
+  .circle-entry .arrow { color:#C5D2E3; font-size:18px; }
+
+  .toast { position:absolute; bottom:110px; left:50%; transform:translateX(-50%);
+    background:rgba(58,74,92,0.9); color:#fff; padding:10px 20px; border-radius:20px;
+    font-size:12px; z-index:300; opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; }
+
+  @media (max-width:860px) {
+    .stage { flex-direction:column; gap:20px; }
+    .intro { display:none; }
+    body { padding:0; }
+    .phone { width:100%; height:100vh; max-width:420px; border-radius:0; padding:0; box-shadow:none; }
+    .screen { border-radius:0; }
+    .notch { display:none; }
+    .view { inset:44px 0 80px 0; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="intro">
+    <div class="kicker">USER EXPERIENCE PROTOTYPE</div>
+    <h1>轻启</h1>
+    <p class="tag">不催促、不惩罚、不排名。<br>先做五分钟，就从这一步开始。</p>
+    <div class="line"></div>
+    <p class="tag" style="font-size:13px;">你的陪伴小精灵「启启」会一直在这里。<br>点一点它，它会和你说说话；<br>完成任务时它会为你开心；<br>状态不好时它会安静陪着你。</p>
+    <p class="meta">2555700101 罗坤凤 · 用户体验与研究<br>指导教师：王柳凤 · 2026.09</p>
+  </aside>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span style="font-size:11px; letter-spacing:2px;">5G&nbsp;▮▮▮&nbsp;100%</span></div>
+
+      <div class="view active" id="view-tasks">
+        <div class="ip-bubble">
+          <div class="ip-avatar" id="ipAvatar">
+            <img id="ipImgTasks" src="assets/ip_normal.png" alt="启启">
+          </div>
+          <div class="chat-bubble" id="ipSpeech">早上好呀，<br>今天先做五分钟就好。</div>
+        </div>
+        <div class="greeting">
+          <div class="hi">今天想从哪里开始？</div>
+        </div>
+        <div class="task-section-label">今天</div>
+        <div class="task-list" id="taskList"></div>
+        <div class="task-section-label">已完成</div>
+        <div class="task-list" id="doneList"></div>
+      </div>
+
+      <div class="view" id="view-focus">
+        <div class="focus-wrap">
+          <div class="focus-ip breathing" id="focusIp">
+            <img src="assets/ip_normal.png" alt="启启陪伴">
+          </div>
+          <div class="focus-title">启启会安静陪你 5 分钟 · 白名单：浏览器 / 文献 / 笔记</div>
+          <div class="ring-wrap">
+            <svg width="220" height="220">
+              <circle class="ring-bg" cx="110" cy="110" r="95"></circle>
+              <circle class="ring-fg" id="focusRing" cx="110" cy="110" r="95"></circle>
+            </svg>
+            <div class="ring-center">
+              <div class="time" id="focusTime">05:00</div>
+              <div class="state" id="focusState">准备开始</div>
+            </div>
+          </div>
+          <div class="focus-actions">
+            <button class="focus-btn focus-start" id="focusBtn">开始 5 分钟</button>
+            <button class="focus-btn focus-exit" id="focusExit">一键退出专注</button>
+          </div>
+          <div class="whitelist-tip">锁机全程保留退出按钮<br>查资料时白名单 App 不受限</div>
+        </div>
+      </div>
+
+      <div class="view" id="view-progress">
+        <div class="task-section-label">本周复盘</div>
+        <div class="glass progress-hero">
+          <div class="progress-ring">
+            <svg width="180" height="180">
+              <circle class="ring-bg" cx="90" cy="90" r="80"></circle>
+              <circle class="ring-fg" id="progRing" cx="90" cy="90" r="80"></circle>
+            </svg>
+            <div class="progress-num">
+              <div class="pct" id="progPct">--%</div>
+              <div class="label">本周完成率</div>
+            </div>
+          </div>
+          <div class="week-hint">就算某天没做完，历史也不会清零。<br>休息是正常的，随时可以重新开始。</div>
+        </div>
+        <div class="task-section-label">最近几周</div>
+        <div class="week-cards">
+          <div class="week-card glass"><div class="wk">上上上周</div><div class="bar"><div class="bar-fill" style="height:40%"></div></div></div>
+          <div class="week-card glass"><div class="wk">上周</div><div class="bar"><div class="bar-fill" style="height:65%"></div></div></div>
+          <div class="week-card glass current"><div class="wk">本周</div><div class="bar"><div class="bar-fill" id="thisWeekBar" style="height:0%"></div></div></div>
+        </div>
+      </div>
+
+      <div class="view" id="view-me">
+        <div class="me-header">
+          <div class="avatar"><img id="meIpImg" src="assets/ip_normal.png" alt="启启"></div>
+          <div>
+            <div class="name">启启的好朋友</div>
+            <div class="sub">温柔地，和自己相处</div>
+          </div>
+        </div>
+        <div class="glass setting-row">
+          <div class="sr-title">提醒频率</div>
+          <div class="sr-desc">默认低频。提醒是温柔的，不是催促。</div>
+          <div class="slider-row"><span>关闭</span><span>低频</span><span>中频</span></div>
+          <input type="range" min="0" max="2" value="1" id="remindSlider">
+        </div>
+        <button class="glass mood-btn" id="moodBtn">今天状态不好，暂停今日提醒</button>
+        <div style="height:14px;"></div>
+        <div class="glass circle-entry" id="circleEntry">
+          <div class="ce-left">熟人小圈子<small>仅 2-4 位好友 · 无排行榜</small></div>
+          <div class="arrow">›</div>
+        </div>
+      </div>
+
+      <button class="fab" id="fab">+</button>
+
+      <div class="modal-mask" id="modalMask">
+        <div class="modal">
+          <h3>写下你想完成的事</h3>
+          <p>可以从小一步开始，不用一次想清楚。</p>
+          <input type="text" id="taskInput" placeholder="例如：写课程大论文 / 复习第三章" maxlength="50">
+          <div class="modal-actions">
+            <button class="btn btn-ghost" id="modalCancel">取消</button>
+            <button class="btn btn-primary" id="modalSave">保存任务</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+
+      <div class="tabbar">
+        <button class="tab active" data-view="tasks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>任务
+        </button>
+        <button class="tab" data-view="focus">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>专注
+        </button>
+        <button class="tab" data-view="progress">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18M6 16l4-6 4 3 5-8"/></svg>进度
+        </button>
+        <button class="tab" data-view="me">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_TASKS = [
+  { id:1, text:'写课程大论文', done:false, breakdown:['确定选题','整理参考文献','列出大纲','写引言初稿','修改润色'] },
+  { id:2, text:'复习第三章概率论', done:false, breakdown:false },
+  { id:3, text:'给妈妈回个电话', done:true, breakdown:false },
+];
+let tasks = JSON.parse(localStorage.getItem('qingqi_tasks') || 'null') || DEFAULT_TASKS;
+let nextId = tasks.reduce((m,t)=>Math.max(m,t.id),0)+1;
+function save(){ localStorage.setItem('qingqi_tasks', JSON.stringify(tasks)); }
+
+const IP_TALK = [
+  '今天也慢慢来，不着急。',
+  '我在这儿陪着你哦。',
+  '先呼吸一下，再开始。',
+  '你已经很棒了。',
+  '五分钟就好，试试看？',
+  '做不完也没关系的。',
+  '要不要喝口水？',
+  '我相信你。',
+];
+const IP_DONE = [
+  '哇！你真的开始了！',
+  '太厉害了，给自己一点掌声。',
+  '这一步，你已经做到了。',
+  '启启为你开心！',
+];
+const IP_SAD = [
+  '好的，今天不打扰你。',
+  '我就在这儿，等你想说话。',
+  '抱抱你，好好休息。',
+];
+
+function ipSpeak(text, img){
+  document.getElementById('ipSpeech').innerHTML = text;
+  if(img){
+    document.getElementById('ipImgTasks').src = img;
+    document.getElementById('meIpImg').src = img;
+  }
+}
+function ipBounce(){
+  const a = document.getElementById('ipAvatar');
+  a.classList.remove('bounce'); void a.offsetWidth; a.classList.add('bounce');
+}
+document.getElementById('ipAvatar').onclick = ()=>{
+  ipSpeak(IP_TALK[Math.floor(Math.random()*IP_TALK.length)], 'assets/ip_normal.png');
+  ipBounce();
+};
+
+function renderTasks(){
+  const list = document.getElementById('taskList');
+  const doneList = document.getElementById('doneList');
+  list.innerHTML = ''; doneList.innerHTML = '';
+  tasks.forEach(t=>{
+    const el = document.createElement('div');
+    el.className = 'glass task-item' + (t.done?' done':'');
+    let html = '<div class="checkbox"></div><div style="flex:1;">';
+    html += '<div class="task-text">'+t.text+'</div>';
+    if(t.breakdown && !t.done){
+      html += '<button class="breakdown-btn">AI 拆成小步骤</button>';
+      if(t._showBreak){
+        html += '<div class="breakdown-list">';
+        t.breakdown.forEach(s=> html += '<div class="sub-task">'+s+'</div>');
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+    el.innerHTML = html;
+    el.onclick = (e)=>{
+      if(e.target.closest('.breakdown-btn')) return;
+      const wasDone = t.done;
+      t.done=!t.done; t._showBreak=false; save(); renderTasks(); renderProgress();
+      if(!wasDone && t.done){
+        ipSpeak(IP_DONE[Math.floor(Math.random()*IP_DONE.length)], 'assets/ip_happy.png');
+        ipBounce();
+        setTimeout(()=>{ ipSpeak('先做五分钟，就从这一步开始。', 'assets/ip_normal.png'); }, 2500);
+      }
+    };
+    const bb = el.querySelector('.breakdown-btn');
+    if(bb) bb.onclick = (e)=>{ e.stopPropagation(); t._showBreak=!t._showBreak; renderTasks(); toast(t._showBreak?'已拆成 5 个 5 分钟小步骤':'已收起'); };
+    (t.done?doneList:list).appendChild(el);
+  });
+}
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+tab.dataset.view).classList.add('active');
+    document.getElementById('fab').style.display = tab.dataset.view==='tasks'?'flex':'none';
+  };
+});
+
+const mask = document.getElementById('modalMask');
+document.getElementById('fab').onclick = ()=>{ mask.classList.add('show'); setTimeout(()=>document.getElementById('taskInput').focus(),300); };
+document.getElementById('modalCancel').onclick = ()=> mask.classList.remove('show');
+mask.onclick = (e)=>{ if(e.target===mask) mask.classList.remove('show'); };
+document.getElementById('modalSave').onclick = ()=>{
+  const v = document.getElementById('taskInput').value.trim();
+  if(!v){ toast('先写一句你想做的事就好'); return; }
+  tasks.unshift({ id:nextId++, text:v, done:false, breakdown:false });
+  document.getElementById('taskInput').value='';
+  mask.classList.remove('show');
+  save(); renderTasks(); renderProgress();
+  ipSpeak('好呀，我记住了。', 'assets/ip_normal.png');
+  ipBounce();
+};
+
+let focusSec = 300, focusTimer = null;
+const CIRC = 660;
+function renderFocus(){
+  const m = Math.floor(focusSec/60), s = focusSec%60;
+  document.getElementById('focusTime').textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  document.getElementById('focusRing').style.strokeDashoffset = CIRC*(1-focusSec/300);
+}
+document.getElementById('focusBtn').onclick = ()=>{
+  const btn = document.getElementById('focusBtn');
+  if(focusTimer){
+    clearInterval(focusTimer); focusTimer=null;
+    btn.textContent='继续 5 分钟'; document.getElementById('focusState').textContent='已暂停';
+  } else {
+    focusTimer = setInterval(()=>{
+      focusSec--;
+      if(focusSec<=0){
+        clearInterval(focusTimer); focusTimer=null; focusSec=300;
+        btn.textContent='再专注一次'; document.getElementById('focusState').textContent='完成了，做得好';
+        toast('5 分钟到了，休息一下吧');
+      }
+      renderFocus();
+    },1000);
+    btn.textContent='暂停'; document.getElementById('focusState').textContent='专注中…启启在陪着你';
+  }
+};
+document.getElementById('focusExit').onclick = ()=>{
+  if(focusTimer){ clearInterval(focusTimer); focusTimer=null; }
+  focusSec=300; renderFocus();
+  document.getElementById('focusBtn').textContent='开始 5 分钟';
+  document.getElementById('focusState').textContent='准备开始';
+  toast('已退出专注，随时可以再回来');
+};
+renderFocus();
+
+function renderProgress(){
+  const done = tasks.filter(t=>t.done).length;
+  const total = tasks.length;
+  const pct = total? Math.round(done/total*100) : 0;
+  document.getElementById('progPct').textContent = pct+'%';
+  document.getElementById('progRing').style.strokeDashoffset = 565*(1-pct/100);
+  document.getElementById('thisWeekBar').style.height = Math.max(pct,8)+'%';
+}
+
+document.getElementById('moodBtn').onclick = function(){
+  this.classList.toggle('paused');
+  if(this.classList.contains('paused')){
+    this.textContent = '今日提醒已暂停 · 启启安静陪着你';
+    ipSpeak(IP_SAD[Math.floor(Math.random()*IP_SAD.length)], 'assets/ip_comfort.png');
+    ipBounce();
+  } else {
+    this.textContent = '今天状态不好，暂停今日提醒';
+    ipSpeak('欢迎回来，慢慢来。', 'assets/ip_normal.png');
+    toast('提醒已恢复低频');
+  }
+};
+document.getElementById('circleEntry').onclick = ()=> toast('演示版：熟人小圈子（最多 4 人）');
+document.getElementById('remindSlider').onchange = (e)=>{
+  toast(['已关闭','低频提醒','中频提醒'][e.target.value]);
+};
+
+let toastTimer=null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+renderTasks();
+renderProgress();
+</script>
+</body>
+</html>

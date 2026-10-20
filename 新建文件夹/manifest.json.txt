@@ -1,0 +1,16 @@
+{
+  "name": "轻启",
+  "short_name": "轻启",
+  "description": "大学生反拖延自我管理工具，先做五分钟，就从这一步开始。",
+  "start_url": "./index.html",
+  "display": "standalone", // ✅关键：standalone = 全屏，像原生App，隐藏地址栏
+  "background_color": "#F7F4EE",
+  "theme_color": "#9ECDBE",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%239ECDBE'/%3E%3Ccircle cx='35' cy='42' r='6' fill='%23fff'/%3E%3Ccircle cx='65' cy='42' r='6' fill='%23fff'/%3E%3Cpath d='M 35 62 Q 50 72 65 62' stroke='%23fff' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E",
+      "sizes": "100x100",
+      "type": "image/svg+xml"
+    }
+  ]
+}
